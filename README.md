@@ -1,16 +1,13 @@
   
-# MIMDRAM: An End-to-End Processing-Using-DRAM System for High-Throughput, Energy-Efficient and Programmer-Transparent Multiple-Instruction Multiple-Data Processing
+# SHIF-DRAM: meme-DRAM with a twist (or a shift?)
 
 [![Academic Code](https://img.shields.io/badge/Origin-Academic%20Code-C1ACA0.svg?style=flat)]() [![Language Badge](https://img.shields.io/badge/Made%20with-C/C++-blue.svg)](https://isocpp.org/std/the-standard) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![contributions welcome](https://img.shields.io/badge/Contributions-welcome-lightgray.svg?style=flat)]() [![Preprint: arXiv](https://img.shields.io/badge/cs.AR-2402.19080-b31b1b?logo=arxiv&logoColor=red)](https://arxiv.org/pdf/2402.19080.pdf) 
 
 
-MIMDRAM is a hardware/software co-designed processing-using-DRAM (PUD) system that introduces new mechanisms to allocate and control only the necessary resources for a given PUD operation. The key idea of MIMDRAM is to leverage fine-grained DRAM (i.e., the ability to independently access smaller segments of a large DRAM row) for PUD computation. MIMDRAM exploits this key idea to enable a multiple-instruction multiple-data (MIMD) execution model in each DRAM subarray (and SIMD execution within each DRAM row segment).
-
-This repository contains the simulation infrastructure used to evaluate MIMDRAM. We plan to release the compiler infrastructure soon.
-
+SHIF-DRAM is based on MIMDRAM. MIMDRAM is a hardware/software co-designed processing-using-DRAM (PUD) system that introduces new mechanisms to allocate and control only the necessary resources for a given PUD operation. The key idea of MIMDRAM is to leverage fine-grained DRAM (i.e., the ability to independently access smaller segments of a large DRAM row) for PUD computation. MIMDRAM exploits this key idea to enable a multiple-instruction multiple-data (MIMD) execution model in each DRAM subarray (and SIMD execution within each DRAM row segment).
 
 ## Citation
-Please cite the following if you find this repository useful:
+Please cite the following if you find this repository useful, since we certainly found it useful:
 
 Geraldo F. Oliveira, Ataberk Olgun, Abdullah Giray Yağlıkçı, F. Nisa Bostancı, Juan Gómez-Luna, Saugata Ghose, Onur Mutlu, "[MIMDRAM: An End-to-End Processing-Using-DRAM System for High-Throughput, Energy-Efficient and Programmer-Transparent Multiple-Instruction Multiple-Data Computing](https://arxiv.org/pdf/2402.19080.pdf)", in HPCA, 2024.
 
@@ -25,7 +22,7 @@ Bibtex entry for citation:
 }
 ```
 
-## Setting up MIMDRAM
+## Setting up SHIF-DRAM
 ### Repository Structure and Installation
 We point out next to the repository structure and some important folders and files.
 
@@ -46,7 +43,7 @@ We point out next to the repository structure and some important folders and fil
 ```
 
 ### Step 0: Prerequisites
-Our framework requires all [gem5 dependencies](https://pages.cs.wisc.edu/~david/courses/cs752/Spring2015/gem5-tutorial/part1/building.html) and was tested using Ubuntu 14.04. 
+Our framework requires all [gem5 dependencies](https://pages.cs.wisc.edu/~david/courses/cs752/Spring2015/gem5-tutorial/part1/building.html) and was tested using Ubuntu 14.04. Not sure why we went back to the stone age.
 
 * To install gem5 dependencies:
 ```
@@ -89,10 +86,3 @@ cd gem5/
 ./build/X86/gem5.opt configs/example/se.py --cpu-type=detailed --caches --l2cache --mem-type=DDR4_2400_x64 --mem-size=8192MB -c ABSOLUTE_PATH/bitweave-buddy.exe -o "10 1"
 ```
 Note that you *must* specify the *absolute path* (ABSOLUTE_PATH) to the folder containing the compiled workloads.
-
-## Getting Help
-If you have any suggestions for improvement, please contact geraldo dot deoliveira at safari dot ethz dot ch.
-If you find any bugs or have further questions or requests, please post an issue at the [issue page](https://github.com/CMU-SAFARI/mimdram/issues).
-
-## Acknowledgments
-We acknowledge the generous gifts from our industrial partners; including Google, Huawei, Intel, Microsoft. This work is supported in part by the Semiconductor Research Corporation, the ETH Future Computing Laboratory, the AI Chip Center for Emerging Smart Systems (ACCESS), and the UIUC/ZJU HYBRID Center.
