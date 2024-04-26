@@ -15,17 +15,18 @@
     #define DWIDTH 8
 #endif
 
-#define ROW_SIZE 8192
-#define BANK_COUNT 16
-#define RANK_COUNT 2
-#define ALIGNMENT (ROW_SIZE * BANK_COUNT * RANK_COUNT)
-
-#define FOR_ALL_ROWS for(int i = 0; i < per_col_rows; i ++)
-#define ROW(ptr) ((void *)(ptr) + i*ROW_SIZE)
+// Already defined in mimdram.h
+// #define ROW_SIZE 8192
+// #define BANK_COUNT 16
+// #define RANK_COUNT 2
+// #define ALIGNMENT (ROW_SIZE * BANK_COUNT * RANK_COUNT)
+// #define FOR_ALL_ROWS for(int i = 0; i < per_col_rows; i ++)
+// #define ROW(ptr) ((void *)(ptr) + i*ROW_SIZE)
 
 extern void rowop_and(void *d, void *s1, void *s2);
 extern void rowop_or(void *d, void *s1, void *s2);
 extern void rowop_not(void *d, void *s);
+extern void rowop_shift(void *d, void *s);
 
 /************/
 /* row shift and mask wrapper function
@@ -96,7 +97,7 @@ void row_add(void *d, void *s1, void *s2, int N, int row_bytes) {
     unsigned *mask;
     mask = malloc(sizeof(unsigned *));
     posix_memalign((void *) &mask, ALIGNMENT, row_bytes);
-    for (int i = 0; i < row_ints; i ++) {
+    for (int i = 0; i < (row_bytes/(N/8)); i ++) {
         mask[i] = ~1;
     }
 
@@ -118,7 +119,7 @@ void row_add(void *d, void *s1, void *s2, int N, int row_bytes) {
     for (int shift = 1; shift < N; shift*=2)
     {
         // left shift prior step results;
-        (if shift == 1) { // special treatment for first itr
+        if (shift == 1) { // special treatment for first itr
             rowop_shift_n_mask((void *) orNshift, (void *) and0, shift, (void *) mask);
             rowop_shift_n_mask((void *) andNshift, (void *) xor0, shift, (void *) mask);
         } else {
@@ -127,7 +128,7 @@ void row_add(void *d, void *s1, void *s2, int N, int row_bytes) {
         }
 
         // Perform intermediate steps
-        (if shift == 1) { // special treatment for first itr
+        if (shift == 1) { // special treatment for first itr
             // Perform or_{N+1} = and_0 | (and_shift_N & xor_0)
             // Perform and_{N+1} = or_N & or_shift_N)
 
@@ -166,12 +167,12 @@ void row_twos_comp(void *d, void *s, int N, int row_bytes) {
     unsigned *ones;    
     ones = malloc(sizeof(unsigned *));
     posix_memalign((void *) &ones, ALIGNMENT, row_bytes);
-    for (int i = 0; i < row_ints; i ++) {
+    for (int i = 0; i < row_bytes/(N/8); i ++) {
         ones[i] = 1;
     }
 
     // Invert
-    rowop_not((void *) , (void *) s);
+    rowop_not((void *) d, (void *) s);
 
     // Add one
     row_add((void *) d, (void *) d, (void *) ones, N, row_bytes);
@@ -194,7 +195,7 @@ void row_reduce(void *d, void *s, int N, int row_bytes) {
     unsigned *mask;    
     mask = malloc(sizeof(unsigned *));
     posix_memalign((void *) &mask, ALIGNMENT, row_bytes);
-    for (int i = 0; i < row_ints; i ++) {
+    for (int i = 0; i < row_bytes/(N/8); i ++) {
         mask[i] = ~1;
     }
 
@@ -202,7 +203,7 @@ void row_reduce(void *d, void *s, int N, int row_bytes) {
     posix_memalign((void *) &temp, ALIGNMENT, row_bytes);
 
     // Binary Reduction
-    for (shift = N; shift < ROW_SIZE; shift *= 2) {
+    for (int shift = N; shift < ROW_SIZE; shift *= 2) {
         if (shift == N)
             rowop_shift_n_mask((void *) temp, (void *) s, shift, (void *) mask);
         else   
@@ -222,7 +223,7 @@ int main(int argc, char **argv) {
 
     int num_bits = (int) SIZE*DWIDTH;
     int row_bytes = num_bits / 8;
-    int row_ints = num_bits / 32;
+    int row_ints = num_bits / DWIDTH;
 
     // allocate input data
     unsigned *vec1, *vec2;
@@ -252,11 +253,11 @@ int main(int argc, char **argv) {
     m5_reset_stats(0,0);
 
     // Difference
-    row_twos_comp((void *) twoComp, (void *) vec2, N, row_bytes);
-    row_add((void *) diff, (void *) vec1, (void *) twoComp, N, row_bytes);
+    row_twos_comp((void *) twoComp, (void *) vec2, DWIDTH, row_bytes);
+    row_add((void *) diff, (void *) vec1, (void *) twoComp, DWIDTH, row_bytes);
 
     // Reduce
-    row_reduce((void *) output, (void *) diff, N, row_bytes);
+    row_reduce((void *) output, (void *) diff, DWIDTH, row_bytes);
 
     // Extract output
     result = output[0];
