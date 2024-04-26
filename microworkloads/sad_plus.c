@@ -5,10 +5,12 @@
 #include <m5op.h>
 #include "mimdram.h"
 
+// Number of complete values
 #ifndef SIZE
     #define SIZE 8
 #endif
 
+// Data-width of values
 #ifndef DWIDTH
     #define DWIDTH 8
 #endif
@@ -33,10 +35,15 @@ extern void rowop_not(void *d, void *s);
 /*  N: number of times to shift left
 /*  mask: bitwise mask row ptr
 /************/
-void shift_n_mask(void *d, void *s, int N, void *mask) {
+void rowop_shift_n_mask(void *d, void *s, int N, void *mask) {
+    
     for (int cnt = 0; cnt < N; cnt++){
         // Left shift 1
-        rowop_shift((void *) d, (void *) s);
+        if (cnt==0)
+            rowop_shift((void *) d, (void *) s);
+        else
+            rowop_shift((void *) d, (void *) d);
+
         // bitwise AND with mask
         rowop_and((void *) d, (void *) d, (void *) mask);
     }
@@ -49,13 +56,13 @@ void shift_n_mask(void *d, void *s, int N, void *mask) {
 /*  d: destination row ptr
 /*  s1: source row ptr
 /*  s2: source 2 row ptr
-/*  per_col_bytes: stupid thing from their code
+/*  row_bytes: stupid thing from their code
 /************/
-void rowop_xor(void *d, void *s1, void *s2, int per_col_bytes) {
+void rowop_xor(void *d, void *s1, void *s2, int row_bytes) {
     // A ^ B = (!A & B) | (A & !B)
     unsigned *scratchA, *scratchB;
-    posix_memalign((void *) &scratchA, ALIGNMENT, per_col_bytes);
-    posix_memalign((void *) &scratchB, ALIGNMENT, per_col_bytes);
+    posix_memalign((void *) &scratchA, ALIGNMENT, row_bytes);
+    posix_memalign((void *) &scratchB, ALIGNMENT, row_bytes);
 
     // !A
     rowop_not((void *) scratchA, (void *) s1);
@@ -80,45 +87,46 @@ void rowop_xor(void *d, void *s1, void *s2, int per_col_bytes) {
 /*  s1: source 1 row ptr
 /*  s2: source 2 row ptr
 /*  N: addition data-width
-/*  per_col_bytes: stupid thing from their code
+/*  row_bytes: stupid thing from their code
 /************/
-void row_add(void *d, void *s1, void *s2, int N, int per_col_bytes) {
+void row_add(void *d, void *s1, void *s2, int N, int row_bytes) {
     // Implements Kogge Stone fast-addition algorithm
 
     // Create bit-mask based on data-width
     unsigned *mask;
-    posix_memalign((void *) &mask, ALIGNMENT, per_col_bytes);
-    // ugh how to do this
+    mask = malloc(sizeof(unsigned *));
+    posix_memalign((void *) &mask, ALIGNMENT, row_bytes);
+    for (int i = 0; i < row_ints; i ++) {
+        mask[i] = ~1;
+    }
 
     // "Front porch" pre processing step
     unsigned *and0, *xor0;
-    posix_memalign((void *) &and0, ALIGNMENT, per_col_bytes);
-    posix_memalign((void *) &xor0, ALIGNMENT, per_col_bytes);
+    posix_memalign((void *) &and0, ALIGNMENT, row_bytes);
+    posix_memalign((void *) &xor0, ALIGNMENT, row_bytes);
     rowop_and((void *) and0, (void *) s1, (void *) s2);
-    rowop_xor((void *) xor0, (void *) s1, (void *) s2, per_col_bytes);
+    rowop_xor((void *) xor0, (void *) s1, (void *) s2, row_bytes);
 
     // Body operations
     unsigned *andN, *orN, *andNshift, *orNshift, *andTemp, *andNCopy;
-    posix_memalign((void *) &andN, ALIGNMENT, per_col_bytes);
-    posix_memalign((void *) &orN, ALIGNMENT, per_col_bytes);
-    posix_memalign((void *) &andNshift, ALIGNMENT, per_col_bytes);
-    posix_memalign((void *) &orNshift, ALIGNMENT, per_col_bytes);
-    posix_memalign((void *) &andTemp, ALIGNMENT, per_col_bytes);
-    posix_memalign((void *) &andNCopy, ALIGNMENT, per_col_bytes);
+    posix_memalign((void *) &andN, ALIGNMENT, row_bytes);
+    posix_memalign((void *) &orN, ALIGNMENT, row_bytes);
+    posix_memalign((void *) &andNshift, ALIGNMENT, row_bytes);
+    posix_memalign((void *) &orNshift, ALIGNMENT, row_bytes);
+    posix_memalign((void *) &andTemp, ALIGNMENT, row_bytes);
+    posix_memalign((void *) &andNCopy, ALIGNMENT, row_bytes);
     for (int shift = 1; shift < N; shift*=2)
     {
         // left shift prior step results;
         (if shift == 1) { // special treatment for first itr
-            shift_n_mask((void *) orNshift, (void *) and0, shift, (void *) mask);
-            shift_n_mask((void *) andNshift, (void *) xor0, shift, (void *) mask);
+            rowop_shift_n_mask((void *) orNshift, (void *) and0, shift, (void *) mask);
+            rowop_shift_n_mask((void *) andNshift, (void *) xor0, shift, (void *) mask);
         } else {
-            shift_n_mask((void *) orNshift, (void *) orN, shift, (void *) mask);
-            shift_n_mask((void *) andNshift, (void *) andN, shift, (void *) mask);
+            rowop_shift_n_mask((void *) orNshift, (void *) orN, shift, (void *) mask);
+            rowop_shift_n_mask((void *) andNshift, (void *) andN, shift, (void *) mask);
         }
 
-        // Perform or_{N+1} = or_N | (or_shift_N & and_N)
-        // Perform and_{N+1} = and_N & and_shift_N)
-
+        // Perform intermediate steps
         (if shift == 1) { // special treatment for first itr
             // Perform or_{N+1} = and_0 | (and_shift_N & xor_0)
             // Perform and_{N+1} = or_N & or_shift_N)
@@ -136,129 +144,127 @@ void row_add(void *d, void *s1, void *s2, int N, int per_col_bytes) {
             rowop_or((void *) orN, (void *) orN, (void *) orNshift);
         }    
     }
-    shift_n_mask((void *) orNshift, (void *) orN, 1, (void *) mask);
+    rowop_shift_n_mask((void *) orNshift, (void *) orN, 1, (void *) mask);
 
     // "Back Porch" post processing steps
-    rowop_xor((void *) d, (void *) xor0, (void *) orNshift, per_col_bytes);
+    rowop_xor((void *) d, (void *) xor0, (void *) orNshift, row_bytes);
+
+    free(mask);
     return;
 }
+
+/************/
+/* two's comlement function
+/* Params
+/*  d: destination row ptr
+/*  s: source row ptr
+/*  N: addition data-width
+/*  row_bytes: stupid thing from their code
+/************/
+void row_twos_comp(void *d, void *s, int N, int row_bytes) {
+    // Create one's-mask based on data-width
+    unsigned *ones;    
+    ones = malloc(sizeof(unsigned *));
+    posix_memalign((void *) &ones, ALIGNMENT, row_bytes);
+    for (int i = 0; i < row_ints; i ++) {
+        ones[i] = 1;
+    }
+
+    // Invert
+    rowop_not((void *) , (void *) s);
+
+    // Add one
+    row_add((void *) d, (void *) d, (void *) ones, N, row_bytes);
+
+    free(ones);
+
+    return;
+}
+
+/************/
+/* row reduce function
+/* Params
+/*  d: destination row ptr
+/*  s: source row ptr
+/*  N: addition data-width
+/*  row_bytes: stupid thing from their code
+/************/
+void row_reduce(void *d, void *s, int N, int row_bytes) {
+    // Create bit-mask based on data-width
+    unsigned *mask;    
+    mask = malloc(sizeof(unsigned *));
+    posix_memalign((void *) &mask, ALIGNMENT, row_bytes);
+    for (int i = 0; i < row_ints; i ++) {
+        mask[i] = ~1;
+    }
+
+    unsigned *temp;
+    posix_memalign((void *) &temp, ALIGNMENT, row_bytes);
+
+    // Binary Reduction
+    for (shift = N; shift < ROW_SIZE; shift *= 2) {
+        if (shift == N)
+            rowop_shift_n_mask((void *) temp, (void *) s, shift, (void *) mask);
+        else   
+            rowop_shift_n_mask((void *) temp, (void *) d, shift, (void *) mask);
+        
+        row_add((void *) d, (void *) d, (void *) temp, N, row_bytes);
+    }
+
+    free(mask);
+
+    return;
+}
+
 
 int main(int argc, char **argv) {
     srand(121324314);
 
-    int col_length = atoi(argv[1]);
-    int num_vals = 1024 << (atoi(argv[2]));
+    int num_bits = (int) SIZE*DWIDTH;
+    int row_bytes = num_bits / 8;
+    int row_ints = num_bits / 32;
 
-    int total_bits = col_length * num_vals;
-    int total_bytes = total_bits / 8;
-    int total_ints = total_bits / 32;
-    int total_vecs = total_bits / 128;
-
-    int per_col_bits = num_vals;
-    int per_col_bytes = num_vals / 8;
-    int per_col_ints = num_vals / 32;
-    int per_col_vecs = num_vals / 128;
-    int per_col_rows = (per_col_bytes + ROW_SIZE - 1) / ROW_SIZE;
-
-    unsigned c1, c2;
-    int dummy;
-
-    // generate c1 and c2;
-    c1 = rand();
-    c2 = rand();
-
-    // allocate col data
-    unsigned **vals;
-    vals = malloc(col_length * sizeof(unsigned *));
-    for (int i = 0; i < col_length; i ++)
-        dummy = posix_memalign((void *) &(vals[i]), ALIGNMENT, per_col_bytes);
+    // allocate input data
+    unsigned *vec1, *vec2;
+    vec1 = malloc(sizeof(unsigned *));
+    posix_memalign((void *) &vec1, ALIGNMENT, row_bytes);
+    vec2 = malloc(sizeof(unsigned *));
+    posix_memalign((void *) &vec2, ALIGNMENT, row_bytes);
 
     // allocate output
     unsigned *output;
-    dummy += posix_memalign((void *) &output, ALIGNMENT, per_col_bytes);
+    posix_memalign((void *) &output, ALIGNMENT, row_bytes);
 
     unsigned result = 0;
     
     // allocate intermediate vectors
-    unsigned *meq1, *meq2, *mlt, *mgt, *neg, *tmp;
-    dummy += posix_memalign((void *) &meq1, ALIGNMENT, per_col_bytes);
-    dummy += posix_memalign((void *) &meq2, ALIGNMENT, per_col_bytes);
-    dummy += posix_memalign((void *) &mlt, ALIGNMENT, per_col_bytes);
-    dummy += posix_memalign((void *) &mgt, ALIGNMENT, per_col_bytes);
-    dummy += posix_memalign((void *) &neg, ALIGNMENT, per_col_bytes);
-    dummy += posix_memalign((void *) &tmp, ALIGNMENT, per_col_bytes);
+    unsigned *twoComp, *diff;
+    posix_memalign((void *) &twoComp, ALIGNMENT, row_bytes);
+    posix_memalign((void *) &diff, ALIGNMENT, row_bytes);
     
-    // initialize col data
-    for (int j = 0; j < col_length; j ++) {
-        for (int i = 0; i < per_col_ints; i ++) {
-            vals[j][i]  = rand();
-        }
+    // initialize input data
+    for (int i = 0; i < row_ints; i ++) {
+        vec1[i] = rand();
+        vec2[i] = rand();
     }
 
-    // set meq1 and meq2 to 1
-    for (int i = 0; i < per_col_ints; i ++) {
-        meq1[i] = 1;
-        meq2[i] = 1;
-        mlt[i] = 0;
-        mgt[i] = 0;
-    }
-    
-    // run the query
-    for (int iter = 0; iter < 2; iter ++) {
-        m5_reset_stats(0,0);
+    // Run the query
+    m5_reset_stats(0,0);
 
-        
-        for (int j = 0; j < col_length; j ++) {
-            unsigned *vec = vals[j];
-            FOR_ALL_ROWS { rowop_not(ROW(neg), ROW(vec)); }
-            int test1 = !!(c1 & (1 << j));
-            int test2 = !!(c2 & (1 << j));
+    // Difference
+    row_twos_comp((void *) twoComp, (void *) vec2, N, row_bytes);
+    row_add((void *) diff, (void *) vec1, (void *) twoComp, N, row_bytes);
 
-            if (test1 == 0 && test2 == 0) {
-                FOR_ALL_ROWS {
-                    rowop_and(ROW(tmp), ROW(meq1), ROW(vec));
-                    rowop_or(ROW(mgt), ROW(mgt), ROW(tmp));
-                    rowop_and(ROW(meq1), ROW(meq1), ROW(neg));
-                    rowop_and(ROW(meq2), ROW(meq2), ROW(neg));
-                }
-            }
-            else if (test1 == 1 && test2 == 0) {
-                FOR_ALL_ROWS {
-                    rowop_and(ROW(meq1), ROW(meq1), ROW(vec));
-                    rowop_and(ROW(meq2), ROW(meq2), ROW(neg));
-                }
-            }
-            else if (test1 == 0 && test2 == 1) {
-                FOR_ALL_ROWS {
-                    rowop_and(ROW(tmp), ROW(meq1), ROW(vec));
-                    rowop_or(ROW(mgt), ROW(mgt), ROW(tmp));
-                    rowop_and(ROW(tmp), ROW(meq2), ROW(neg));
-                    rowop_or(ROW(mlt), ROW(mlt), ROW(tmp));
-                    rowop_and(ROW(meq1), ROW(meq1), ROW(neg));
-                    rowop_and(ROW(meq2), ROW(meq2), ROW(vec));
-                }
-            }
-            else if (test1 == 1 && test2 == 1) {
-                FOR_ALL_ROWS {
-                    rowop_and(ROW(tmp), ROW(meq2), ROW(neg));
-                    rowop_or(ROW(mlt), ROW(mlt), ROW(tmp));
-                    rowop_and(ROW(meq1), ROW(meq1), ROW(vec));
-                    rowop_and(ROW(meq2), ROW(meq2), ROW(vec));
-                }
-            }
-        }
+    // Reduce
+    row_reduce((void *) output, (void *) diff, N, row_bytes);
 
-        result = 0;
-        FOR_ALL_ROWS {
-            rowop_and(ROW(output), ROW(mlt), ROW(mgt));
-            unsigned *vals = (unsigned *)(ROW(output));
-            for (int j = 0; j < ROW_SIZE / 4; j ++)
-                result += upopcount(vals[j]);
-        }
-    }
+    // Extract output
+    result = output[0];
+
     m5_dump_stats(0,0);
 
-    printf("%u\n", result);
+    free(vec1);
+    free(vec2);
     
     return 0;
 }
