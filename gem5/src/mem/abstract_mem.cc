@@ -368,6 +368,12 @@ AbstractMemory::access(PacketPtr pkt)
 			case Request::ROWAAP:
 				//TODO implement
 				break;
+            case Request::ROWLS:
+                //actually implment this, now is a copy of NOT
+                for (int i = 0; i < ROW_SIZE; i += sizeof(uint64_t)) {
+                    *dest++ = ~*src1++;
+                }
+                break;
             default:
                 assert(false);
                 break;

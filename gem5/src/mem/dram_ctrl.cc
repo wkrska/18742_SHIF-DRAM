@@ -529,7 +529,7 @@ DRAMCtrl::addToWriteQueue(PacketPtr pkt, unsigned int pktCount)
         	assert(dram_pkt->bank == dram_pkt1->bank);
 		}
         // Only care about dram_pkt2 if it's a binary op
-        if (addrs->op != Request::ROWNOT && addrs->op != Request::ROWAAP && addrs->op != Request::ROWAP) {
+        if (addrs->op != Request::ROWNOT && addrs->op != Request::ROWAAP && addrs->op != Request::ROWAP && addrs->op != Request::ROWLS) {
           assert(dram_pkt->rank == dram_pkt2->rank);
           assert(dram_pkt->bank == dram_pkt2->bank);
         }
@@ -1196,11 +1196,16 @@ DRAMCtrl::doDRAMAccess(DRAMPacket* dram_pkt)
                 aapBank(rank, bank, cmd_at, Bank::B_T0_T1_T2,   dram_pkt->row,    true); cmd_at = bank.actAllowedAt;
                 break;
             case Request::ROWAP:
-		apBank (rank, bank, cmd_at, Bank::B_T0_T1_T2); cmd_at = bank.actAllowedAt;		//TODO replace Bank::B_T0_T1_T2 with correct bank
-		break;
-	    case Request::ROWAAP:
-		aapBank(rank, bank, cmd_at, 0, 0, true); cmd_at = bank.actAllowedAt;	//TODO replace NULLs with correct banks
-		break;
+                apBank (rank, bank, cmd_at, Bank::B_T0_T1_T2); cmd_at = bank.actAllowedAt;		//TODO replace Bank::B_T0_T1_T2 with correct bank
+                break;
+            case Request::ROWAAP:
+                aapBank(rank, bank, cmd_at, 0, 0, true); cmd_at = bank.actAllowedAt;	//TODO replace NULLs with correct banks
+                break;
+            case Request::ROWLS:
+                //742 TODO change this instead of copying ROWNOT
+                aapBank(rank, bank, cmd_at, dram_pkt->src1_row, Bank::B_DCC0N, true); cmd_at = bank.actAllowedAt;
+                aapBank(rank, bank, cmd_at, Bank::B_DCC0,       dram_pkt->row, true); cmd_at = bank.actAllowedAt;
+                break;
             default:
                 assert(false);
                 break;

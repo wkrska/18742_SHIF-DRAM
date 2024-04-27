@@ -205,7 +205,8 @@ class Request
         ROWNOT,
         ROWXOR,
 		ROWAP,
-		ROWAAP
+		ROWAAP,
+        ROWLS
     };
 
     struct RowOpPayload {
@@ -462,7 +463,7 @@ class Request
 			req_src1->_vaddr = addrs->src1;
 		}
 
-        if (addrs->op == ROWNOT || addrs->op == ROWAP || addrs->op == ROWAAP) {
+        if (addrs->op == ROWNOT || addrs->op == ROWAP || addrs->op == ROWAAP || addrs->op == ROWLS) {
             // NOT, AAP and AP operations have no third operand
             req_src2 = NULL;
         } else {
