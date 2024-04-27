@@ -4,7 +4,9 @@
 #include <time.h>
 #include <omp.h>
 
-#define SIZE 8
+#ifndef SIZE
+#define SIZE 1024
+#endif
 
 void right_circular_shift(uint32_t* vec, uint32_t len) {
     uint32_t temp = vec[len - 1];
@@ -59,9 +61,7 @@ int main() {
         vec1[i] = rand() % 100;
         vec2[i] = vec1[i];
     }
-    left_circular_shift(vec2, SIZE);
-    printf("Sum of absolute differences: %d\n", sum_abs_diff(vec1, vec2, SIZE));
-    right_circular_shift(vec2, SIZE);
+
     printf("Sum of absolute differences: %d\n", sum_abs_diff(vec1, vec2, SIZE));
 
     free(vec1);

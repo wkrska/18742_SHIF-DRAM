@@ -7,21 +7,13 @@
 
 // Number of complete values
 #ifndef SIZE
-    #define SIZE 8
+    #define SIZE 1024
 #endif
 
 // Data-width of values
 #ifndef DWIDTH
-    #define DWIDTH 8
+    #define DWIDTH 32
 #endif
-
-// Already defined in mimdram.h
-// #define ROW_SIZE 8192
-// #define BANK_COUNT 16
-// #define RANK_COUNT 2
-// #define ALIGNMENT (ROW_SIZE * BANK_COUNT * RANK_COUNT)
-// #define FOR_ALL_ROWS for(int i = 0; i < per_col_rows; i ++)
-// #define ROW(ptr) ((void *)(ptr) + i*ROW_SIZE)
 
 extern void rowop_and(void *d, void *s1, void *s2);
 extern void rowop_or(void *d, void *s1, void *s2);
