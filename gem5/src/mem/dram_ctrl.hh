@@ -183,6 +183,7 @@ class DRAMCtrl : public AbstractMemory
         static const uint32_t B_DCC1_T0_T3 = -18;
         static const uint32_t C_0          = -19;
         static const uint32_t C_1          = -20;
+        static const uint32_t B_T0_SH      = -21;
 
         uint32_t openRow;
         uint8_t bank;

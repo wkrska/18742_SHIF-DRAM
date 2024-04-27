@@ -341,6 +341,7 @@ AbstractMemory::access(PacketPtr pkt)
         uint64_t *src2 = (uint64_t*)(pmemAddr + addrs->src2 - range.start());
         DPRINTF(MemoryAccess, "Performing rowop %d on %p (%x) and %p (%x)\n",
             addrs->op, src1, *src1, src2, src2 == NULL? 0 : *src2);
+        uint64_t shift_last = 0;
         switch (addrs->op) {
             case Request::ROWAND:
                 for (int i = 0; i < ROW_SIZE; i += sizeof(uint64_t)) {
@@ -366,12 +367,21 @@ AbstractMemory::access(PacketPtr pkt)
 				//TODO implement
 				break;
 			case Request::ROWAAP:
-				//TODO implement
+				for (int i = 0; i < ROW_SIZE; i += sizeof(uint64_t)) {
+                    *dest++ = *src1++;
+                }
 				break;
             case Request::ROWLS:
                 //actually implment this, now is a copy of NOT
                 for (int i = 0; i < ROW_SIZE; i += sizeof(uint64_t)) {
-                    *dest++ = ~*src1++;
+                    *dest = *src1 << 1;
+                    
+                    *dest = (*dest & (0xFFFFFFFFFFFFFFFE)) | shift_last;
+                    //printf("dest%lxshift%ld\n", dest[i],shift_last);
+                    shift_last = (*src1 >> 63) != 0;
+                    //printf("src%lxshift%ld\n", src1[i],shift_last);
+                    dest++;
+                    src1++;
                 }
                 break;
             default:

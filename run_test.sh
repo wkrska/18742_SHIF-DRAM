@@ -1,4 +1,4 @@
-filename="sad_plus"
+filename="my_test"
 # filename="bitweave-buddy"
 
 cd microworkloads/

@@ -1202,9 +1202,8 @@ DRAMCtrl::doDRAMAccess(DRAMPacket* dram_pkt)
                 aapBank(rank, bank, cmd_at, 0, 0, true); cmd_at = bank.actAllowedAt;	//TODO replace NULLs with correct banks
                 break;
             case Request::ROWLS:
-                //742 TODO change this instead of copying ROWNOT
-                aapBank(rank, bank, cmd_at, dram_pkt->src1_row, Bank::B_DCC0N, true); cmd_at = bank.actAllowedAt;
-                aapBank(rank, bank, cmd_at, Bank::B_DCC0,       dram_pkt->row, true); cmd_at = bank.actAllowedAt;
+                aapBank(rank, bank, cmd_at, dram_pkt->src1_row, Bank::B_T0, true); cmd_at = bank.actAllowedAt;
+                aapBank(rank, bank, cmd_at, Bank::B_T0_SH,       dram_pkt->row, true); cmd_at = bank.actAllowedAt;
                 break;
             default:
                 assert(false);
