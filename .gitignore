@@ -1,0 +1,13 @@
+/gem5/build/
+/gem5/parser.out
+/gem5/parsetab.py
+/gem5/cscope.files
+/gem5/cscope.out
+gem5/**/*.pyc
+gem5/*~
+gem5/.*.swp
+/gem5/m5out/
+/gem5/src/doxygen/
+/gem5/ext/dramsim2/DRAMSim2/
+/gem5/ext/mcpat/regression/*/*.out
+/microworkloads/*.exe
