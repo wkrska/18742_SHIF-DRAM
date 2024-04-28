@@ -172,13 +172,6 @@ void row_reduce(void *d, void *s, int N, int row_bytes) {
     #ifdef DEBUG
     printf("Row reduce\n");
     #endif
-    // Create bit-mask based on data-width
-    unsigned *mask;    
-    mask = malloc(sizeof(unsigned *));
-    posix_memalign((void *) &mask, ALIGNMENT, row_bytes);
-    for (int i = 0; i < row_bytes/(N/8); i ++) {
-        mask[i] = ~1;
-    }
 
     unsigned *temp;
     posix_memalign((void *) &temp, ALIGNMENT, row_bytes);
@@ -188,15 +181,21 @@ void row_reduce(void *d, void *s, int N, int row_bytes) {
         #ifdef DEBUG
         printf("\titr: %d\n",shift);
         #endif
-        if (shift == N)
-            rowop_shift_n_mask((void *) temp, (void *) s, shift, (void *) mask);
-        else   
-            rowop_shift_n_mask((void *) temp, (void *) d, shift, (void *) mask);
+        if (shift == N) // If first round take from source, else use running sum
+            for (int s = 0; s < shift; s++)
+                if (s == 0)
+                    rowop_shift((void *) temp, (void *) s);
+                else
+                    rowop_shift((void *) temp, (void *) temp);
+        else
+            for (int s = 0; s < shift; s++)
+                if (s == 0)
+                    rowop_shift((void *) temp, (void *) d);
+                else
+                    rowop_shift((void *) temp, (void *) temp);
         
         row_add((void *) d, (void *) d, (void *) temp, N, row_bytes);
     }
-
-    free(mask);
 
     return;
 }
