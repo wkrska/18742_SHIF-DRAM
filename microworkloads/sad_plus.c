@@ -17,6 +17,7 @@
 
 extern void rowop_and(void *d, void *s1, void *s2);
 extern void rowop_or(void *d, void *s1, void *s2);
+extern void rowop_xor(void *d, void *s1, void *s2);
 extern void rowop_not(void *d, void *s);
 extern void rowop_shift(void *d, void *s);
 
@@ -29,7 +30,9 @@ extern void rowop_shift(void *d, void *s);
 /*  mask: bitwise mask row ptr
 /************/
 void rowop_shift_n_mask(void *d, void *s, int N, void *mask) {
-    
+    #ifdef DEBUG
+    printf("rowop: shift n mask\n");
+    #endif
     for (int cnt = 0; cnt < N; cnt++){
         // Left shift 1
         if (cnt==0)
@@ -39,38 +42,11 @@ void rowop_shift_n_mask(void *d, void *s, int N, void *mask) {
 
         // bitwise AND with mask
         rowop_and((void *) d, (void *) d, (void *) mask);
+        #ifdef DEBUG
+        printf("\titr: %d\n", cnt);
+        #endif
     }
     return;
-}
-
-/************/
-/* row xor function
-/* Params
-/*  d: destination row ptr
-/*  s1: source row ptr
-/*  s2: source 2 row ptr
-/*  row_bytes: stupid thing from their code
-/************/
-void rowop_xor(void *d, void *s1, void *s2, int row_bytes) {
-    // A ^ B = (!A & B) | (A & !B)
-    unsigned *scratchA, *scratchB;
-    posix_memalign((void *) &scratchA, ALIGNMENT, row_bytes);
-    posix_memalign((void *) &scratchB, ALIGNMENT, row_bytes);
-
-    // !A
-    rowop_not((void *) scratchA, (void *) s1);
-    // !A & B
-    rowop_and((void *) scratchA, (void *) scratchA, (void *) s2);
-    // !B
-    rowop_not((void *) scratchB, (void *) s2);
-    // A & !B
-    rowop_and((void *) scratchB, (void *) scratchB, (void *) s1);
-    // XOR
-    rowop_or((void *) d, (void *) scratchA, (void *) scratchB);
-
-    free(scratchA);
-    free(scratchB);
-    return;    
 }
 
 /************/
@@ -83,6 +59,10 @@ void rowop_xor(void *d, void *s1, void *s2, int row_bytes) {
 /*  row_bytes: stupid thing from their code
 /************/
 void row_add(void *d, void *s1, void *s2, int N, int row_bytes) {
+    #ifdef DEBUG
+        printf("Row add\n");
+    #endif
+
     // Implements Kogge Stone fast-addition algorithm
 
     // Create bit-mask based on data-width
@@ -98,7 +78,7 @@ void row_add(void *d, void *s1, void *s2, int N, int row_bytes) {
     posix_memalign((void *) &and0, ALIGNMENT, row_bytes);
     posix_memalign((void *) &xor0, ALIGNMENT, row_bytes);
     rowop_and((void *) and0, (void *) s1, (void *) s2);
-    rowop_xor((void *) xor0, (void *) s1, (void *) s2, row_bytes);
+    rowop_xor((void *) xor0, (void *) s1, (void *) s2);
 
     // Body operations
     unsigned *andN, *orN, *andNshift, *orNshift, *andTemp, *andNCopy;
@@ -110,6 +90,9 @@ void row_add(void *d, void *s1, void *s2, int N, int row_bytes) {
     posix_memalign((void *) &andNCopy, ALIGNMENT, row_bytes);
     for (int shift = 1; shift < N; shift*=2)
     {
+        #ifdef DEBUG
+        printf("\tBody %d\n", shift);
+        #endif
         // left shift prior step results;
         if (shift == 1) { // special treatment for first itr
             rowop_shift_n_mask((void *) orNshift, (void *) and0, shift, (void *) mask);
@@ -140,7 +123,7 @@ void row_add(void *d, void *s1, void *s2, int N, int row_bytes) {
     rowop_shift_n_mask((void *) orNshift, (void *) orN, 1, (void *) mask);
 
     // "Back Porch" post processing steps
-    rowop_xor((void *) d, (void *) xor0, (void *) orNshift, row_bytes);
+    rowop_xor((void *) d, (void *) xor0, (void *) orNshift);
 
     free(mask);
     return;
@@ -155,6 +138,9 @@ void row_add(void *d, void *s1, void *s2, int N, int row_bytes) {
 /*  row_bytes: stupid thing from their code
 /************/
 void row_twos_comp(void *d, void *s, int N, int row_bytes) {
+    #ifdef DEBUG
+    printf("row two's comp\n");
+    #endif
     // Create one's-mask based on data-width
     unsigned *ones;    
     ones = malloc(sizeof(unsigned *));
@@ -183,6 +169,9 @@ void row_twos_comp(void *d, void *s, int N, int row_bytes) {
 /*  row_bytes: stupid thing from their code
 /************/
 void row_reduce(void *d, void *s, int N, int row_bytes) {
+    #ifdef DEBUG
+    printf("Row reduce\n");
+    #endif
     // Create bit-mask based on data-width
     unsigned *mask;    
     mask = malloc(sizeof(unsigned *));
@@ -196,6 +185,9 @@ void row_reduce(void *d, void *s, int N, int row_bytes) {
 
     // Binary Reduction
     for (int shift = N; shift < ROW_SIZE; shift *= 2) {
+        #ifdef DEBUG
+        printf("\titr: %d\n",shift);
+        #endif
         if (shift == N)
             rowop_shift_n_mask((void *) temp, (void *) s, shift, (void *) mask);
         else   
@@ -211,6 +203,10 @@ void row_reduce(void *d, void *s, int N, int row_bytes) {
 
 
 int main(int argc, char **argv) {
+    #ifdef DEBUG
+    printf("Debugging Mode\n");
+    #endif
+
     srand(121324314);
 
     int num_bits = (int) SIZE*DWIDTH;
