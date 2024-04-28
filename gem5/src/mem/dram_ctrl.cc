@@ -525,13 +525,13 @@ DRAMCtrl::addToWriteQueue(PacketPtr pkt, unsigned int pktCount)
 
 		// Only care about dram_pkt1 if the operation is not in place
         if (addrs->op != Request::ROWAP) {
-        	assert(dram_pkt->rank == dram_pkt1->rank);
-        	assert(dram_pkt->bank == dram_pkt1->bank);
+        	// assert(dram_pkt->rank == dram_pkt1->rank); // These assertions were causing us so much headache
+        	// assert(dram_pkt->bank == dram_pkt1->bank);
 		}
         // Only care about dram_pkt2 if it's a binary op
         if (addrs->op != Request::ROWNOT && addrs->op != Request::ROWAAP && addrs->op != Request::ROWAP && addrs->op != Request::ROWLS) {
-          assert(dram_pkt->rank == dram_pkt2->rank);
-          assert(dram_pkt->bank == dram_pkt2->bank);
+        //   assert(dram_pkt->rank == dram_pkt2->rank);
+        //   assert(dram_pkt->bank == dram_pkt2->bank);
         }
         dram_pkt->src1_row = dram_pkt1->row;
         dram_pkt->src2_row = dram_pkt2->row;

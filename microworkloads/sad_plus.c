@@ -3,6 +3,8 @@
 #include <malloc.h>
 #include <immintrin.h>
 #include <m5op.h>
+#include <time.h>
+#include <omp.h>
 #include "mimdram.h"
 
 // Number of complete values
@@ -69,7 +71,7 @@ void row_add(void *d, void *s1, void *s2, int N, int row_bytes) {
     unsigned *mask;
     mask = malloc(sizeof(unsigned *));
     posix_memalign((void *) &mask, ALIGNMENT, row_bytes);
-    for (int i = 0; i < (row_bytes/(N/8)); i ++) {
+    for (int i = 0; i < row_bytes/(N/8)*(N/32); i ++) {
         mask[i] = ~1;
     }
 
@@ -145,7 +147,7 @@ void row_twos_comp(void *d, void *s, int N, int row_bytes) {
     unsigned *ones;    
     ones = malloc(sizeof(unsigned *));
     posix_memalign((void *) &ones, ALIGNMENT, row_bytes);
-    for (int i = 0; i < row_bytes/(N/8); i ++) {
+    for (int i = 0; i < row_bytes/(N/8)*(N/32); i ++) {
         ones[i] = 1;
     }
 
@@ -181,18 +183,23 @@ void row_reduce(void *d, void *s, int N, int row_bytes) {
         #ifdef DEBUG
         printf("\titr: %d\n",shift);
         #endif
-        if (shift == N) // If first round take from source, else use running sum
-            for (int s = 0; s < shift; s++)
-                if (s == 0)
+        if (shift == N) { // If first round take from source, else use running sum
+            for (int s = 0; s < shift; s++) {
+                // printf("\t\ts: %d\n",s);
+                if (s == 0) 
                     rowop_shift((void *) temp, (void *) s);
-                else
+                else 
                     rowop_shift((void *) temp, (void *) temp);
-        else
-            for (int s = 0; s < shift; s++)
-                if (s == 0)
+            }
+        } else {
+            for (int s = 0; s < shift; s++) {
+                // printf("\t\ts: %d\n",s);
+                if (s == 0) 
                     rowop_shift((void *) temp, (void *) d);
-                else
+                else 
                     rowop_shift((void *) temp, (void *) temp);
+            }
+        }
         
         row_add((void *) d, (void *) d, (void *) temp, N, row_bytes);
     }
@@ -200,6 +207,17 @@ void row_reduce(void *d, void *s, int N, int row_bytes) {
     return;
 }
 
+// reduce a vector to a single value by summing all elements
+uint32_t vec_red(uint32_t* vec, uint32_t len) {
+    uint32_t sum = 0;
+    // loop is executed in parallel, with each thread adding up a portion of the elements
+    // http://jakascorner.com/blog/2016/06/omp-for-reduction.html
+    #pragma omp parallel for reduction(+:sum)
+    for (uint32_t i = 0; i < len; i++) {
+        sum += abs(vec[i]);
+    }
+    return sum;
+}
 
 int main(int argc, char **argv) {
     #ifdef DEBUG
@@ -208,6 +226,7 @@ int main(int argc, char **argv) {
 
     srand(121324314);
 
+    /********* SETUP*********/
     int num_bits = (int) SIZE*DWIDTH;
     int row_bytes = num_bits / 8;
     int row_ints = num_bits / DWIDTH;
@@ -231,25 +250,28 @@ int main(int argc, char **argv) {
     posix_memalign((void *) &diff, ALIGNMENT, row_bytes);
     
     // initialize input data
-    for (int i = 0; i < row_ints; i ++) {
+    for (int i = 0; i < row_ints*(DWIDTH/32); i ++) {
         vec1[i] = rand();
         vec2[i] = rand();
     }
 
-    // Run the query
+    /********* Run Query *********/
     m5_reset_stats(0,0);
 
-    // Difference
+    // Difference in RAM
     row_twos_comp((void *) twoComp, (void *) vec2, DWIDTH, row_bytes);
     row_add((void *) diff, (void *) vec1, (void *) twoComp, DWIDTH, row_bytes);
 
-    // Reduce
-    row_reduce((void *) output, (void *) diff, DWIDTH, row_bytes);
+    // Reduce on CPU
+    result = vec_red(diff, SIZE);
+    // row_reduce((void *) output, (void *) diff, DWIDTH, row_bytes);
 
-    // Extract output
-    result = output[0];
+    // // Extract output
+    // result = output[0];
 
     m5_dump_stats(0,0);
+
+    printf("Sum of absolute differences: %d\n", result);
 
     free(vec1);
     free(vec2);

@@ -1,0 +1,14 @@
+gem5 Simulator System.  http://gem5.org
+gem5 is copyrighted software; use the --copyright option for details.
+
+gem5 compiled Apr 28 2024 15:40:48
+gem5 started Apr 28 2024 16:16:31
+gem5 executing on 9bb880ee75e3
+command line: ./build/X86/gem5.opt configs/example/se.py --cpu-type=detailed --caches --l2cache --mem-type=DDR4_2400_x64 --mem-size=8192MB -c /home/MIMDRAM/18872_SHIF-DRAM/microworkloads/sad_plus.exe -o '10 1'
+
+Global frequency set at 1000000000000 ticks per second
+**** REAL SIMULATION ****
+info: Entering event queue @ 0.  Starting simulation...
+info: Increasing stack size by one page.
+Sum of absolute differences: 2048
+Exiting @ tick 417403500 because target called exit()
