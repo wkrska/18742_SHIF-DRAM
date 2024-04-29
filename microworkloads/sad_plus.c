@@ -17,6 +17,11 @@
     #define DWIDTH 32
 #endif
 
+// Select CPU engagement
+#ifndef SELECT
+    #define SELECT 2
+#endif
+
 extern void rowop_and(void *d, void *s1, void *s2);
 extern void rowop_or(void *d, void *s1, void *s2);
 extern void rowop_xor(void *d, void *s1, void *s2);
@@ -163,6 +168,52 @@ void row_twos_comp(void *d, void *s, int N, int row_bytes) {
 }
 
 /************/
+/* row abs val function
+/* Params
+/*  d: destination row ptr
+/*  s: source row ptr
+/*  N: addition data-width
+/*  row_bytes: stupid thing from their code
+/************/
+void row_abs_val(void *d, void *s, int N, int row_bytes) {
+    #ifdef DEBUG
+    printf("abs val\n");
+    #endif
+
+    // Create one's-mask based on data-width
+    unsigned *mask;    
+    mask = malloc(sizeof(unsigned *));
+    posix_memalign((void *) &mask, ALIGNMENT, row_bytes);
+    for (int i = 0; i < row_bytes/(N/8)*(N/32); i ++) {
+        mask[i] = 1 << (N-1); // mask MSB
+    }
+
+    // Sign Extend
+    unsigned *sign_extend;    
+    posix_memalign((void *) &sign_extend, ALIGNMENT, row_bytes);
+    rowop_and((void *) sign_extend, (void *) s, (void *) mask);
+    for (int i = 0; i < N; i++) {
+        rowop_shift((void *) sign_extend, (void *) sign_extend);
+        rowop_or((void *) mask, (void *) mask, (void *) sign_extend);
+    }
+
+    // Use mask to capture negative values, then invert
+    rowop_and((void *) sign_extend, (void *) s, (void *) mask);
+    row_twos_comp((void *) sign_extend, (void *) sign_extend, N, row_bytes);
+
+    // Invert mask, and use mask to write non-negative values
+    rowop_not((void *) mask, (void *) mask);
+    rowop_and((void *) d, (void *) s, (void *) mask);
+
+    // Copy inverted values
+    rowop_or((void *) d, (void *) d, (void *) sign_extend);
+   
+    free(mask);
+
+    return;
+}
+
+/************/
 /* row reduce function
 /* Params
 /*  d: destination row ptr
@@ -207,8 +258,21 @@ void row_reduce(void *d, void *s, int N, int row_bytes) {
     return;
 }
 
+
 // reduce a vector to a single value by summing all elements
 uint32_t vec_red(uint32_t* vec, uint32_t len) {
+    uint32_t sum = 0;
+    // loop is executed in parallel, with each thread adding up a portion of the elements
+    // http://jakascorner.com/blog/2016/06/omp-for-reduction.html
+    #pragma omp parallel for reduction(+:sum)
+    for (uint32_t i = 0; i < len; i++) {
+        sum += vec[i];
+    }
+    return sum;
+}
+
+// reduce a vector to a single value by summing all elements
+uint32_t vec_abs_val_red(uint32_t* vec, uint32_t len) {
     uint32_t sum = 0;
     // loop is executed in parallel, with each thread adding up a portion of the elements
     // http://jakascorner.com/blog/2016/06/omp-for-reduction.html
@@ -262,12 +326,24 @@ int main(int argc, char **argv) {
     row_twos_comp((void *) twoComp, (void *) vec2, DWIDTH, row_bytes);
     row_add((void *) diff, (void *) vec1, (void *) twoComp, DWIDTH, row_bytes);
 
-    // Reduce on CPU
-    result = vec_red(diff, SIZE);
-    // row_reduce((void *) output, (void *) diff, DWIDTH, row_bytes);
-
-    // // Extract output
-    // result = output[0];
+    // Select CPU engagement
+    switch ((int) SELECT) {
+        case 0:
+            row_abs_val((void *) diff, (void *) diff, DWIDTH, row_bytes);
+            row_reduce((void *) output, (void *) diff, DWIDTH, row_bytes);
+            result = output[0];
+            break;
+        case 1:
+            row_abs_val((void *) diff, (void *) diff, DWIDTH, row_bytes);
+            result = vec_red(diff, SIZE);
+            break;
+        case 2:
+            result = vec_abs_val_red(diff, SIZE);
+            break;
+        default:
+            result = vec_abs_val_red(diff, SIZE);
+            break;
+    }
 
     m5_dump_stats(0,0);
 
