@@ -391,14 +391,15 @@ AbstractMemory::access(PacketPtr pkt)
                     src1++;
                 }
                 for (int i = 0; i < ROW_SIZE; i += sizeof(uint64_t)) {
+                    dest--;
+                    src1--;
                     *dest = *src1 >> 1;
                     
                     *dest = (*dest & (0x7FFFFFFFFFFFFFFF)) | (shift_last<<63);
                     //printf("dest%lxshift%ld\n", dest[i],shift_last);
                     shift_last = (*src1 & 0x1) != 0;
                     //printf("src%lxshift%ld\n", src1[i],shift_last);
-                    dest--;
-                    src1--;
+                    
                 }
                 break;
             default:
