@@ -68,7 +68,7 @@ cd ..
 To compile a workload, you need to link the source code with the **../gem5/util/m5** folder, as follows (we use the bitweave-buddy.c file as an example):
 ```
 cd microworkloads/
-gcc -**static -std=c99 -O3 -msse2 -I ../gem5/util/m5 m5op_x86.S rowop.S** bitweave-buddy.c -o bitweave-buddy.exe
+gcc -static -std=c99 -O3 -msse2 -I ../gem5/util/m5 m5op_x86.S rowop.S** sad_plus.c -o sad_plus.exe
 cd .. 
 ```
 
@@ -83,6 +83,6 @@ cd ..
 After building gem5 and the workloads, you can execute a simulation as follows:
 ```
 cd gem5/
-./build/X86/gem5.opt configs/example/se.py --cpu-type=detailed --caches --l2cache --mem-type=DDR4_2400_x64 --mem-size=8192MB -c ABSOLUTE_PATH/bitweave-buddy.exe -o "10 1"
+./build/X86/gem5.opt configs/example/se.py --cpu-type=detailed --caches --l2cache --mem-type=DDR4_2400_x64 --mem-size=8192MB -c ABSOLUTE_PATH/sad_plus.exe -o "10 1"
 ```
 Note that you *must* specify the *absolute path* (ABSOLUTE_PATH) to the folder containing the compiled workloads.
