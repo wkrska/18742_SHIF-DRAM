@@ -464,7 +464,7 @@ class Request
 			req_src1->_vaddr = addrs->src1;
 		}
 
-        if (addrs->op == ROWNOT || addrs->op == ROWAP || addrs->op == ROWAAP || addrs->op == ROWLS) {
+        if (addrs->op == ROWNOT || addrs->op == ROWAP || addrs->op == ROWAAP || addrs->op == ROWLS || addrs->op == ROWRS) {
             // NOT, AAP and AP operations have no third operand
             req_src2 = NULL;
         } else {
