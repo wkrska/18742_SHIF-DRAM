@@ -20,6 +20,7 @@ SHIF-DRAM is based on MIMDRAM. MIMDRAM is a hardware/software co-designed proces
 |            +-- request.hh
 |            +-- abstract_mem.cc
 |            +-- dram_ctrl.cc
+```
 
 ## Setting up SHIF-DRAM
 ### Repository Structure and Installation
