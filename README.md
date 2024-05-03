@@ -1,26 +1,25 @@
-  
 # SHIF-DRAM: meme-DRAM with a twist (or a shift?)
 
 [![Academic Code](https://img.shields.io/badge/Origin-Academic%20Code-C1ACA0.svg?style=flat)]() [![Language Badge](https://img.shields.io/badge/Made%20with-C/C++-blue.svg)](https://isocpp.org/std/the-standard) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![contributions welcome](https://img.shields.io/badge/Contributions-welcome-lightgray.svg?style=flat)]() [![Preprint: arXiv](https://img.shields.io/badge/cs.AR-2402.19080-b31b1b?logo=arxiv&logoColor=red)](https://arxiv.org/pdf/2402.19080.pdf) 
 
-
 SHIF-DRAM is based on MIMDRAM. MIMDRAM is a hardware/software co-designed processing-using-DRAM (PUD) system that introduces new mechanisms to allocate and control only the necessary resources for a given PUD operation. The key idea of MIMDRAM is to leverage fine-grained DRAM (i.e., the ability to independently access smaller segments of a large DRAM row) for PUD computation. MIMDRAM exploits this key idea to enable a multiple-instruction multiple-data (MIMD) execution model in each DRAM subarray (and SIMD execution within each DRAM row segment).
 
-## Citation
-Please cite the following if you find this repository useful, since we certainly found it useful:
-
-Geraldo F. Oliveira, Ataberk Olgun, Abdullah Giray Yağlıkçı, F. Nisa Bostancı, Juan Gómez-Luna, Saugata Ghose, Onur Mutlu, "[MIMDRAM: An End-to-End Processing-Using-DRAM System for High-Throughput, Energy-Efficient and Programmer-Transparent Multiple-Instruction Multiple-Data Computing](https://arxiv.org/pdf/2402.19080.pdf)", in HPCA, 2024.
-
-Bibtex entry for citation:
-
+## List of changed files from MIMDRAM to SHIF-DRAM
 ```
-@inproceedings{mimdram,
-    author = "Oliveira, Geraldo F and Olgun, Ataberk and Yaglik{\c{c}}i, A. Giray and Bostanci, Nisa and G{\'o}mez-Luna, Juan and Ghose, Saugata and Mutlu, Onur",
-    title = "{MIMDRAM: An End-to-End Processing-Using-DRAM System for High-Throughput, Energy-Efficient and Programmer-Transparent Multiple-Instruction Multiple-Data Computing}",
-    booktitle = "HPCA",
-    year = "2024"
-}
-```
+.
++-- gem5/
+|   +-- src/
+|       +-- arch/
+|           +-- x86/
+|               +-- isa/
+|                   +-- microops/
+|                       +-- rowbit.isa
+|                   +-- /decoder/
+|                       +-- two_byte_opcodes.isa
+|        +-- mem/
+|            +-- request.hh
+|            +-- abstract_mem.cc
+|            +-- dram_ctrl.cc
 
 ## Setting up SHIF-DRAM
 ### Repository Structure and Installation
