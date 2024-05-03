@@ -17,12 +17,12 @@ def read_line(filename):
     return None
 
 if __name__ == '__main__':
-  S = [ 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536];
-  D = [ 8, 16, 32];
+  S = [ 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576]
+  D = [ 8, 16, 32]
 
   # Loop through files with increasing numbers
-  for s in S:
-    for d in D:
+  for d in D:
+    for s in S:
       filename = "temp_results/" + str(s) + "_" + str(d) + ".txt"
       line = read_line(filename)
       print(line)

@@ -27,6 +27,7 @@ extern void rowop_or(void *d, void *s1, void *s2);
 extern void rowop_xor(void *d, void *s1, void *s2);
 extern void rowop_not(void *d, void *s);
 extern void rowop_shift(void *d, void *s);
+extern void rowop_shift_right(void *d, void *s);
 
 /************/
 /* row shift and mask wrapper function
@@ -37,23 +38,14 @@ extern void rowop_shift(void *d, void *s);
 /*  mask: bitwise mask row ptr
 /************/
 void rowop_shift_n_mask(void *d, void *s, int N, void *mask) {
-    #ifdef DEBUG
-    printf("rowop: shift n mask\n");
-    #endif
-    for (int cnt = 0; cnt < N; cnt++){
-        // Left shift 1
-        if (cnt==0)
-            rowop_shift((void *) d, (void *) s);
-        else
-            rowop_shift((void *) d, (void *) d);
+  for (int cnt = 0; cnt < N; cnt++){
+    // Left shift 1
+    rowop_shift((void *) d, ((cnt==0) ? (void *) s : (void *) s));
 
-        // bitwise AND with mask
-        rowop_and((void *) d, (void *) d, (void *) mask);
-        #ifdef DEBUG
-        printf("\titr: %d\n", cnt);
-        #endif
-    }
-    return;
+    // bitwise AND with mask
+    rowop_and((void *) d, (void *) d, (void *) mask);
+  }
+  return;
 }
 
 /************/
@@ -66,74 +58,67 @@ void rowop_shift_n_mask(void *d, void *s, int N, void *mask) {
 /*  row_bytes: stupid thing from their code
 /************/
 void row_add(void *d, void *s1, void *s2, int N, int row_bytes) {
-    #ifdef DEBUG
-        printf("Row add\n");
-    #endif
+  // Implements Kogge Stone fast-addition algorithm
 
-    // Implements Kogge Stone fast-addition algorithm
+  // Create bit-mask based on data-width
+  unsigned *mask;
+  mask = malloc(sizeof(unsigned *));
+  posix_memalign((void *) &mask, ALIGNMENT, row_bytes);
+  for (int i = 0; i < row_bytes/(N/8)*(N/32); i ++) {
+      mask[i] = ~1;
+  }
 
-    // Create bit-mask based on data-width
-    unsigned *mask;
-    mask = malloc(sizeof(unsigned *));
-    posix_memalign((void *) &mask, ALIGNMENT, row_bytes);
-    for (int i = 0; i < row_bytes/(N/8)*(N/32); i ++) {
-        mask[i] = ~1;
+  // "Front porch" pre processing step
+  unsigned *and0, *xor0;
+  posix_memalign((void *) &and0, ALIGNMENT, row_bytes);
+  posix_memalign((void *) &xor0, ALIGNMENT, row_bytes);
+  rowop_and((void *) and0, (void *) s1, (void *) s2);
+  rowop_xor((void *) xor0, (void *) s1, (void *) s2);
+
+  // Body operations
+  unsigned *andN, *orN, *andNshift, *orNshift, *andTemp, *andNCopy;
+  posix_memalign((void *) &andN, ALIGNMENT, row_bytes);
+  posix_memalign((void *) &orN, ALIGNMENT, row_bytes);
+  posix_memalign((void *) &andNshift, ALIGNMENT, row_bytes);
+  posix_memalign((void *) &orNshift, ALIGNMENT, row_bytes);
+  posix_memalign((void *) &andTemp, ALIGNMENT, row_bytes);
+  posix_memalign((void *) &andNCopy, ALIGNMENT, row_bytes);
+  for (int shift = 1; shift < N; shift*=2)
+  {
+    // left shift prior step results;
+    if (shift == 1) { // special treatment for first itr
+      rowop_shift_n_mask((void *) orNshift, (void *) and0, shift, (void *) mask);
+      rowop_shift_n_mask((void *) andNshift, (void *) xor0, shift, (void *) mask);
+    } else {
+      rowop_shift_n_mask((void *) orNshift, (void *) orN, shift, (void *) mask);
+      rowop_shift_n_mask((void *) andNshift, (void *) andN, shift, (void *) mask);
     }
 
-    // "Front porch" pre processing step
-    unsigned *and0, *xor0;
-    posix_memalign((void *) &and0, ALIGNMENT, row_bytes);
-    posix_memalign((void *) &xor0, ALIGNMENT, row_bytes);
-    rowop_and((void *) and0, (void *) s1, (void *) s2);
-    rowop_xor((void *) xor0, (void *) s1, (void *) s2);
+    // Perform intermediate steps
+    if (shift == 1) { // special treatment for first itr
+      // Perform or_{N+1} = and_0 | (and_shift_N & xor_0)
+      // Perform and_{N+1} = or_N & or_shift_N)
 
-    // Body operations
-    unsigned *andN, *orN, *andNshift, *orNshift, *andTemp, *andNCopy;
-    posix_memalign((void *) &andN, ALIGNMENT, row_bytes);
-    posix_memalign((void *) &orN, ALIGNMENT, row_bytes);
-    posix_memalign((void *) &andNshift, ALIGNMENT, row_bytes);
-    posix_memalign((void *) &orNshift, ALIGNMENT, row_bytes);
-    posix_memalign((void *) &andTemp, ALIGNMENT, row_bytes);
-    posix_memalign((void *) &andNCopy, ALIGNMENT, row_bytes);
-    for (int shift = 1; shift < N; shift*=2)
-    {
-        #ifdef DEBUG
-        printf("\tBody %d\n", shift);
-        #endif
-        // left shift prior step results;
-        if (shift == 1) { // special treatment for first itr
-            rowop_shift_n_mask((void *) orNshift, (void *) and0, shift, (void *) mask);
-            rowop_shift_n_mask((void *) andNshift, (void *) xor0, shift, (void *) mask);
-        } else {
-            rowop_shift_n_mask((void *) orNshift, (void *) orN, shift, (void *) mask);
-            rowop_shift_n_mask((void *) andNshift, (void *) andN, shift, (void *) mask);
-        }
+      rowop_aap((void *) andNCopy, (void *) and0);
+      rowop_and((void *) andTemp, (void *) xor0, (void *) andNshift);
+      rowop_and((void *) andN, (void *) xor0, (void *) orNshift);
+      rowop_or((void *) orN, (void *) andNCopy, (void *) andTemp);
+    } else {
+      // Perform or_{N+1} = or_N | (or_shift_N & and_N)
+      // Perform and_{N+1} = and_N & and_shift_N)
 
-        // Perform intermediate steps
-        if (shift == 1) { // special treatment for first itr
-            // Perform or_{N+1} = and_0 | (and_shift_N & xor_0)
-            // Perform and_{N+1} = or_N & or_shift_N)
+      rowop_and((void *) andTemp, (void *) andN, (void *) orNshift);
+      rowop_and((void *) andN, (void *) andN, (void *) andNshift);
+      rowop_or((void *) orN, (void *) orN, (void *) orNshift);
+    }    
+  }
+  rowop_shift_n_mask((void *) orNshift, (void *) orN, 1, (void *) mask);
 
-            rowop_aap((void *) andNCopy, (void *) and0);
-            rowop_and((void *) andTemp, (void *) xor0, (void *) andNshift);
-            rowop_and((void *) andN, (void *) xor0, (void *) orNshift);
-            rowop_or((void *) orN, (void *) andNCopy, (void *) andTemp);
-        } else {
-            // Perform or_{N+1} = or_N | (or_shift_N & and_N)
-            // Perform and_{N+1} = and_N & and_shift_N)
+  // "Back Porch" post processing steps
+  rowop_xor((void *) d, (void *) xor0, (void *) orNshift);
 
-            rowop_and((void *) andTemp, (void *) andN, (void *) orNshift);
-            rowop_and((void *) andN, (void *) andN, (void *) andNshift);
-            rowop_or((void *) orN, (void *) orN, (void *) orNshift);
-        }    
-    }
-    rowop_shift_n_mask((void *) orNshift, (void *) orN, 1, (void *) mask);
-
-    // "Back Porch" post processing steps
-    rowop_xor((void *) d, (void *) xor0, (void *) orNshift);
-
-    free(mask);
-    return;
+  free(mask);
+  return;
 }
 
 /************/
@@ -145,9 +130,6 @@ void row_add(void *d, void *s1, void *s2, int N, int row_bytes) {
 /*  row_bytes: stupid thing from their code
 /************/
 void row_twos_comp(void *d, void *s, int N, int row_bytes) {
-    #ifdef DEBUG
-    printf("row two's comp\n");
-    #endif
     // Create one's-mask based on data-width
     unsigned *ones;    
     ones = malloc(sizeof(unsigned *));
@@ -176,16 +158,12 @@ void row_twos_comp(void *d, void *s, int N, int row_bytes) {
 /*  row_bytes: stupid thing from their code
 /************/
 void row_abs_val(void *d, void *s, int N, int row_bytes) {
-    #ifdef DEBUG
-    printf("abs val\n");
-    #endif
-
     // Create one's-mask based on data-width
     unsigned *mask;    
     mask = malloc(sizeof(unsigned *));
     posix_memalign((void *) &mask, ALIGNMENT, row_bytes);
     for (int i = 0; i < row_bytes/(N/8)*(N/32); i ++) {
-        mask[i] = 1 << (N-1); // mask MSB
+        mask[i] = 1 << (N-1); // mask all but MSB
     }
 
     // Sign Extend
@@ -193,7 +171,7 @@ void row_abs_val(void *d, void *s, int N, int row_bytes) {
     posix_memalign((void *) &sign_extend, ALIGNMENT, row_bytes);
     rowop_and((void *) sign_extend, (void *) s, (void *) mask);
     for (int i = 0; i < N; i++) {
-        rowop_shift((void *) sign_extend, (void *) sign_extend);
+        rowop_shift_right((void *) sign_extend, (void *) sign_extend);
         rowop_or((void *) mask, (void *) mask, (void *) sign_extend);
     }
 
@@ -222,42 +200,23 @@ void row_abs_val(void *d, void *s, int N, int row_bytes) {
 /*  row_bytes: stupid thing from their code
 /************/
 void row_reduce(void *d, void *s, int N, int row_bytes) {
-    #ifdef DEBUG
-    printf("Row reduce\n");
-    #endif
+  unsigned *temp;
+  posix_memalign((void *) &temp, ALIGNMENT, row_bytes);
 
-    unsigned *temp;
-    posix_memalign((void *) &temp, ALIGNMENT, row_bytes);
-
-    // Binary Reduction
-    for (int shift = N; shift < ROW_SIZE; shift *= 2) {
-        #ifdef DEBUG
-        printf("\titr: %d\n",shift);
-        #endif
-        if (shift == N) { // If first round take from source, else use running sum
-            for (int s = 0; s < shift; s++) {
-                // printf("\t\ts: %d\n",s);
-                if (s == 0) 
-                    rowop_shift((void *) temp, (void *) s);
-                else 
-                    rowop_shift((void *) temp, (void *) temp);
-            }
-        } else {
-            for (int s = 0; s < shift; s++) {
-                // printf("\t\ts: %d\n",s);
-                if (s == 0) 
-                    rowop_shift((void *) temp, (void *) d);
-                else 
-                    rowop_shift((void *) temp, (void *) temp);
-            }
-        }
-        
-        row_add((void *) d, (void *) d, (void *) temp, N, row_bytes);
+  // Binary Reduction
+  for (int shift = N; shift < ROW_SIZE; shift *= 2) {
+   if (shift == N) { // If first round take from source, else use running sum
+      for (int i = 0; i < shift; i++)
+        rowop_shift((void *) temp, ((i==0) ? (void *) s : (void *) temp));
+    } else {
+      for (int i = 0; i < shift; i++) 
+        rowop_shift((void *) temp, ((i==0) ? (void *) d : (void *) temp));
     }
+    row_add((void *) d, (void *) d, (void *) temp, N, row_bytes);
+  }
 
-    return;
+  return;
 }
-
 
 // reduce a vector to a single value by summing all elements
 uint32_t vec_red(uint32_t* vec, uint32_t len) {

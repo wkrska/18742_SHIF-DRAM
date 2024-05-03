@@ -11,3 +11,4 @@ gem5/.*.swp
 /gem5/ext/dramsim2/DRAMSim2/
 /gem5/ext/mcpat/regression/*/*.out
 /microworkloads/*.exe
+/microworkloads/test*
