@@ -235,6 +235,7 @@
                     0x60: RowOp::ROWAP();
                     0x61: RowOp::ROWAAP();
                     0x62: RowOp::ROWLS();
+                    0x63: RowOp::ROWRS();
                     default: Inst::UD2();
                 }
             }

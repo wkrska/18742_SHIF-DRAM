@@ -1205,6 +1205,10 @@ DRAMCtrl::doDRAMAccess(DRAMPacket* dram_pkt)
                 aapBank(rank, bank, cmd_at, dram_pkt->src1_row, Bank::B_T0, true); cmd_at = bank.actAllowedAt;
                 aapBank(rank, bank, cmd_at, Bank::B_T0_SH,       dram_pkt->row, true); cmd_at = bank.actAllowedAt;
                 break;
+            case Request::ROWRS:
+                aapBank(rank, bank, cmd_at, dram_pkt->src1_row, Bank::B_T0_SH, true); cmd_at = bank.actAllowedAt;
+                aapBank(rank, bank, cmd_at, Bank::B_T0,       dram_pkt->row, true); cmd_at = bank.actAllowedAt;
+                break;
             default:
                 assert(false);
                 break;

@@ -206,7 +206,8 @@ class Request
         ROWXOR,
 		ROWAP,
 		ROWAAP,
-        ROWLS
+        ROWLS,
+        ROWRS
     };
 
     struct RowOpPayload {
